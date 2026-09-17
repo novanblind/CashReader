@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Cash Reader by Novan</title>
+    <style>
+        :root {
+            --accent: #ffd600;
+            --accent-green: #00e676;
+            --border: #333333;
+            --btn-bg: #1c1c1c;
+            --btn-sec: #2a2a2a;
+            --danger: #d32f2f;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000000;
+        }
+
+        /* Area Kamera Layar Penuh di Atas */
+        #liveVideo {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: calc(100vh - 128px);
+            object-fit: cover;
+            z-index: 1;
+        }
+
+        /* Garis Pindai Tipis */
+        .scan-radar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+            box-shadow: 0 0 12px var(--accent-green);
+            animation: radarMove 1.5s infinite linear;
+            z-index: 2;
+            pointer-events: none;
+            display: none;
+        }
+
+        @keyframes radarMove {
+            0% { top: 0%; opacity: 0.2; }
+            50% { top: calc(100vh - 130px); opacity: 1; }
+            100% { top: 0%; opacity: 0.2; }
+        }
+
+        /* Area Tombol Kontrol Bawah */
+        .bottom-controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 128px;
+            background: #0d0d0d;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 16px;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        /* Tombol Ambil Foto */
+        .btn-capture {
+            width: 100%;
+            max-width: 500px;
+            height: 52px;
+            background: var(--accent-green);
+            color: #000000;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 800;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.15s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-capture:active {
+            transform: scale(0.97);
+            background: #00c853;
+        }
+
+        .btn-capture:disabled {
+            background: #444444;
+            color: #888888;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Tombol Pengaturan */
+        .btn-settings-bottom {
+            width: 100%;
+            max-width: 500px;
+            height: 44px;
+            background: var(--btn-bg);
+            color: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-settings-bottom:active {
+            background: #2a2a2a;
+            transform: scale(0.98);
+        }
+
+        .btn-capture:focus-visible, .btn-settings-bottom:focus-visible {
+            outline: 3px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* Zona Aksesibilitas Pembaca Layar */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+
+        /* Dialog Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.94);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            padding: 16px;
+        }
+
+        .modal-box {
+            background: #181818;
+            border: 2px solid var(--accent);
+            border-radius: 18px;
+            padding: 22px;
+            max-width: 460px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            color: #fff;
+        }
+
+        .modal-box h2 {
+            font-size: 1.25rem;
+            color: var(--accent);
+            margin-bottom: 16px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .setting-item {
+            margin-bottom: 14px;
+        }
+
+        .setting-item label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #ddd;
+            margin-bottom: 6px;
+        }
+
+        .setting-toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #242424;
+            padding: 12px 14px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .setting-toggle span {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .switch-input {
+            width: 22px;
+            height: 22px;
+            accent-color: var(--accent-green);
+            cursor: pointer;
+        }
+
+        input[type="text"], select {
+            width: 100%;
+            background: #242424;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: #fff;
+            padding: 10px;
+            font-size: 0.9rem;
+        }
+
+        .btn-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .btn-action-modal {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        .btn-save {
+            background: var(--accent-green);
+            color: #000;
+        }
+
+        .btn-reset-key {
+            background: var(--btn-sec);
+            color: #ffd600;
+            border: 1px solid var(--border);
+        }
+
+        .btn-reset-all {
+            background: #331515;
+            color: #ff8a80;
+            border: 1px solid #5c1d1d;
+        }
+
+        .btn-close {
+            background: #333;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Kamera Layar Penuh -->
+    <video id="liveVideo" autoplay playsinline muted></video>
+    <div id="radarLine" class="scan-radar"></div>
+
+    <!-- Zona Suara Aksesibilitas Pembaca Layar -->
+    <div id="srStatus" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+
+    <!-- Panel Tombol Bawah -->
+    <div class="bottom-controls">
+        <button 
+            id="btnCapture" 
+            class="btn-capture" 
+            onclick="takePhotoAndScan()" 
+            aria-label="Ambil foto">
+            Ambil foto
+        </button>
+
+        <button 
+            class="btn-settings-bottom" 
+            onclick="openSettingsModal()" 
+            aria-label="Pengaturan">
+            Pengaturan
+        </button>
+    </div>
+
+    <!-- Dialog Izin Akses Kamera -->
+    <div id="permissionModal" class="modal-overlay" style="display: none;">
+        <div class="modal-box" style="text-align: center;">
+            <h2>Izin Kamera Diperlukan</h2>
+            <p style="font-size: 0.9rem; color: #b0bec5; margin-bottom: 20px;">
+                Aplikasi membutuhkan akses kamera belakang untuk mendeteksi uang.
+            </p>
+            <button class="btn-action-modal btn-save" onclick="requestCameraAccess()">
+                Berikan Izin Kamera
+            </button>
+        </div>
+    </div>
+
+    <!-- Dialog Pengaturan Lengkap -->
+    <div id="settingsModal" class="modal-overlay" style="display: none;">
+        <div class="modal-box">
+            <h2>Pengaturan</h2>
+
+            <!-- Kunci API Groq -->
+            <div class="setting-item">
+                <label for="inputApiKey">Kunci API Groq:</label>
+                <input type="text" id="inputApiKey" placeholder="gsk_...">
+            </div>
+
+            <!-- Model Vision -->
+            <div class="setting-item">
+                <label for="inputModel">Model Vision:</label>
+                <input type="text" id="inputModel" value="qwen/qwen3.8-27b">
+            </div>
+
+            <!-- Resolusi Gambar Tangkapan Kamera (Bawaan 720 Piksel Dicentang) -->
+            <div class="setting-item">
+                <label for="selectResolution">Resolusi Gambar Tangkapan:</label>
+                <select id="selectResolution">
+                    <option value="320">320 Piksel (Sangat Cepat dan Ringan)</option>
+                    <option value="420">420 Piksel (Sedang)</option>
+                    <option value="540">540 Piksel (Tajam)</option>
+                    <option value="640">640 Piksel (Sangat Tajam)</option>
+                    <option value="720" selected>720 Piksel (HD Jernih - Bawaan)</option>
+                    <option value="960">960 Piksel (Ultra Tajam)</option>
+                    <option value="1080">1080 Piksel (Maksimal Full HD)</option>
+                </select>
+            </div>
+
+            <!-- Sakelar Lampu Senter Otomatis (Bawaan Tidak Aktif) -->
+            <div class="setting-toggle">
+                <span>Lampu Flash atau Senter Otomatis</span>
+                <input type="checkbox" id="toggleAutoTorch" class="switch-input">
+            </div>
+
+            <!-- Sakelar Getar -->
+            <div class="setting-toggle">
+                <span>Getaran Sensor</span>
+                <input type="checkbox" id="toggleVibrate" class="switch-input" checked>
+            </div>
+
+            <!-- Sakelar Nada Cash Reader -->
+            <div class="setting-toggle">
+                <span>Nada Suara Cash Reader</span>
+                <input type="checkbox" id="toggleBeep" class="switch-input" checked>
+            </div>
+
+            <!-- Sakelar Pengucapan TTS -->
+            <div class="setting-toggle">
+                <span>Pembacaan Suara Nominal</span>
+                <input type="checkbox" id="toggleTts" class="switch-input" checked>
+            </div>
+
+            <!-- Tombol Aksi Pengaturan -->
+            <div class="btn-stack">
+                <button class="btn-action-modal btn-save" onclick="saveAllSettings()">Simpan Pengaturan</button>
+                <button class="btn-action-modal btn-reset-key" onclick="resetApiKey()">Reset Kunci API</button>
+                <button class="btn-action-modal btn-reset-all" onclick="resetAllSettings()">Reset Semua Pengaturan</button>
+                <button class="btn-action-modal btn-close" onclick="closeSettingsModal()">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="canvas" style="display:none;"></canvas>
+
+<script>
+    const DEFAULT_API_KEY = "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";
+    const DEFAULT_MODEL = "qwen/qwen3.8-27b";
+    const DEFAULT_RESOLUTION = "720";
+
+    const CASH_INSTRUCTION = `Tugas: Kenali nominal uang rupiah pada gambar secara akurat meskipun posisi uang agak terlipat, kusut, atau miring.
+Aturan Wajib:
+1. Sebutkan HANYA nilai nominalnya saja (contoh: "Seratus ribu rupiah", "Lima puluh ribu rupiah", "Dua puluh ribu rupiah", "Sepuluh ribu rupiah", "Lima ribu rupiah", "Dua ribu rupiah", "Seribu rupiah", "Lima ratus rupiah").
+2. DILARANG KERAS menyebut kata "lembar", "keping", "buah", "satu", atau jumlah fisiknya. Jangan katakan "satu lembar seratus ribu", tetapi LANGSUNG: "Seratus ribu rupiah".
+3. Teliti angka nol dan gambar pahlawan agar tidak keliru membedakan 2.000 vs 20.000 atau 10.000 vs 50.000.
+4. Jika tidak ada uang, jawab HANYA: "Tidak ada uang yang terdeteksi".
+5. Dilarang memberikan teks pembuka/penutup atau deskripsi benda lain.`;
+
+    const video = document.getElementById('liveVideo');
+    const srStatus = document.getElementById('srStatus');
+    const canvas = document.getElementById('canvas');
+    const btnCapture = document.getElementById('btnCapture');
+    const radarLine = document.getElementById('radarLine');
+    const permissionModal = document.getElementById('permissionModal');
+    const settingsModal = document.getElementById('settingsModal');
+
+    const inputApiKey = document.getElementById('inputApiKey');
+    const inputModel = document.getElementById('inputModel');
+    const selectResolution = document.getElementById('selectResolution');
+    const toggleAutoTorch = document.getElementById('toggleAutoTorch');
+    const toggleVibrate = document.getElementById('toggleVibrate');
+    const toggleBeep = document.getElementById('toggleBeep');
+    const toggleTts = document.getElementById('toggleTts');
+
+    let isProcessing = false;
+    let videoTrack = null;
+    let isTorchOn = false;
+
+    function loadSavedSettings() {
+        inputApiKey.value = localStorage.getItem('cash_api_key') || DEFAULT_API_KEY;
+        inputModel.value = localStorage.getItem('cash_model') || DEFAULT_MODEL;
+        selectResolution.value = localStorage.getItem('cash_resolution') || DEFAULT_RESOLUTION;
+        toggleAutoTorch.checked = localStorage.getItem('cash_opt_autotorch') === 'true';
+        toggleVibrate.checked = localStorage.getItem('cash_opt_vibrate') !== 'false';
+        toggleBeep.checked = localStorage.getItem('cash_opt_beep') !== 'false';
+        toggleTts.checked = localStorage.getItem('cash_opt_tts') !== 'false';
+    }
+    loadSavedSettings();
+
+    // Nada Cash Reader (C6 - 1046.5 Hz & E6 - 1318.5 Hz)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playCashReaderSound() {
+        if (!toggleBeep.checked) return;
+        try {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+            osc1.type = "sine";
+            osc1.frequency.setValueAtTime(1046.5, now);
+            gain1.gain.setValueAtTime(0.35, now);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+            osc1.connect(gain1);
+            gain1.connect(audioCtx.destination);
+            osc1.start(now);
+            osc1.stop(now + 0.05);
+
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = "sine";
+            osc2.frequency.setValueAtTime(1318.5, now + 0.05);
+            gain2.gain.setValueAtTime(0.35, now + 0.05);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            osc2.start(now + 0.05);
+            osc2.stop(now + 0.14);
+        } catch(e) {}
+    }
+
+    function playShutterClick() {
+        try {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(800, now);
+            osc.frequency.exponentialRampToValueAtTime(200, now + 0.04);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.04);
+        } catch(e) {}
+    }
+
+    // Fungsi Pengucapan Suara (Otomatis Menggunakan Suara Bahasa Indonesia Sistem / Pembaca Layar)
+    function speak(text) {
+        if (srStatus) srStatus.innerText = text;
+        if (!toggleTts.checked || !('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+        
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'id-ID';
+        window.speechSynthesis.speak(utter);
+    }
+
+    function openSettingsModal() {
+        settingsModal.style.display = "flex";
+        speak("Membuka menu pengaturan.");
+    }
+
+    function closeSettingsModal() {
+        settingsModal.style.display = "none";
+    }
+
+    async function setTorchState(enable) {
+        if (!videoTrack) return;
+        try {
+            const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+            if (capabilities.torch) {
+                await videoTrack.applyConstraints({ advanced: [{ torch: enable }] });
+                isTorchOn = enable;
+            }
+        } catch(e) {}
+    }
+
+    function saveAllSettings() {
+        localStorage.setItem('cash_api_key', inputApiKey.value.trim());
+        localStorage.setItem('cash_model', inputModel.value.trim());
+        localStorage.setItem('cash_resolution', selectResolution.value);
+        localStorage.setItem('cash_opt_autotorch', toggleAutoTorch.checked);
+        localStorage.setItem('cash_opt_vibrate', toggleVibrate.checked);
+        localStorage.setItem('cash_opt_beep', toggleBeep.checked);
+        localStorage.setItem('cash_opt_tts', toggleTts.checked);
+
+        setTorchState(toggleAutoTorch.checked);
+        closeSettingsModal();
+        speak("Pengaturan berhasil disimpan.");
+    }
+
+    function resetApiKey() {
+        inputApiKey.value = DEFAULT_API_KEY;
+        localStorage.setItem('cash_api_key', DEFAULT_API_KEY);
+        speak("Kunci API telah dikembalikan ke bawaan.");
+    }
+
+    function resetAllSettings() {
+        inputApiKey.value = DEFAULT_API_KEY;
+        inputModel.value = DEFAULT_MODEL;
+        selectResolution.value = DEFAULT_RESOLUTION;
+        toggleAutoTorch.checked = false;
+        toggleVibrate.checked = true;
+        toggleBeep.checked = true;
+        toggleTts.checked = true;
+
+        localStorage.removeItem('cash_api_key');
+        localStorage.removeItem('cash_model');
+        localStorage.removeItem('cash_resolution');
+        localStorage.removeItem('cash_opt_autotorch');
+        localStorage.removeItem('cash_opt_vibrate');
+        localStorage.removeItem('cash_opt_beep');
+        localStorage.removeItem('cash_opt_tts');
+
+        setTorchState(false);
+        speak("Semua pengaturan telah dikembalikan ke setelan pabrik.");
+    }
+
+    // Prosedur Membuka Kamera
+    async function requestCameraAccess() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: { ideal: "environment" },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                },
+                audio: false
+            });
+
+            video.srcObject = stream;
+            videoTrack = stream.getVideoTracks()[0];
+            permissionModal.style.display = "none";
+
+            if (toggleAutoTorch.checked) {
+                setTimeout(() => setTorchState(true), 250);
+            } else {
+                setTorchState(false);
+            }
+
+            speak("Kamera aktif. Tekan tombol ambil foto untuk mengenali uang.");
+            return true;
+        } catch (err) {
+            permissionModal.style.display = "flex";
+            speak("Izin kamera belum diberikan. Ketuk tombol berikan izin kamera.");
+            return false;
+        }
+    }
+
+    // Inisialisasi Kamera Saat Pertama Dimuat (Tanpa Pengumuman 'Sedang Membuka Kamera')
+    async function autoCheckPermissionOnLoad() {
+        try {
+            if (navigator.permissions && navigator.permissions.query) {
+                const status = await navigator.permissions.query({ name: 'camera' });
+                if (status.state === 'granted') {
+                    requestCameraAccess();
+                    return;
+                }
+            }
+        } catch (e) {}
+
+        try {
+            const directStream = await navigator.mediaDevices.getUserMedia({
+                video: { 
+                    facingMode: { ideal: "environment" },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                },
+                audio: false
+            });
+            video.srcObject = directStream;
+            videoTrack = directStream.getVideoTracks()[0];
+            permissionModal.style.display = "none";
+
+            if (toggleAutoTorch.checked) {
+                setTimeout(() => setTorchState(true), 250);
+            } else {
+                setTorchState(false);
+            }
+
+            speak("Kamera aktif. Tekan tombol ambil foto untuk mengenali uang.");
+        } catch (err) {
+            permissionModal.style.display = "flex";
+            setTimeout(() => {
+                speak("Izin kamera diperlukan. Ketuk tombol berikan izin kamera.");
+            }, 500);
+        }
+    }
+
+    function captureOptimizedBase64() {
+        if (!video.videoWidth) return null;
+        const ctx = canvas.getContext('2d');
+        
+        const targetW = parseInt(selectResolution.value) || 720;
+        const targetH = Math.round((video.videoHeight * targetW) / video.videoWidth);
+        canvas.width = targetW;
+        canvas.height = targetH;
+        
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(video, 0, 0, targetW, targetH);
+        
+        return canvas.toDataURL('image/jpeg', 0.65).split(',')[1];
+    }
+
+    async function takePhotoAndScan() {
+        if (isProcessing) return;
+
+        // Pemberitahuan jika tombol ditekan saat kamera belum terbuka
+        if (!videoTrack || video.readyState < 2) {
+            speak("Kamera belum terbuka. Mohon izinkan akses kamera terlebih dahulu.");
+            requestCameraAccess();
+            return;
+        }
+
+        const base64Img = captureOptimizedBase64();
+        if (!base64Img) return;
+
+        isProcessing = true;
+        btnCapture.disabled = true;
+        btnCapture.innerText = "Memproses";
+        radarLine.style.display = "block";
+
+        playShutterClick();
+        if (toggleVibrate.checked && navigator.vibrate) {
+            navigator.vibrate(50);
+        }
+
+        speak("Memproses foto.");
+
+        const apiKey = inputApiKey.value.trim();
+        const model = inputModel.value.trim();
+
+        const payload = {
+            model: model,
+            temperature: 0.0,
+            max_tokens: 25,
+            messages: [
+                { role: "system", content: CASH_INSTRUCTION },
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: "Nominal uang?" },
+                        { type: "image_url", image_url: { url: "data:image/jpeg;base64," + base64Img } }
+                    ]
+                }
+            ]
+        };
+
+        try {
+            const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + apiKey
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                const result = data.choices?.[0]?.message?.content?.trim();
+                handleScanResult(result);
+            } else {
+                const errJson = await res.json().catch(() => ({}));
+                const errMsg = errJson.error?.message || "Kesalahan server";
+                speak("Gagal memproses: " + errMsg);
+            }
+        } catch (e) {
+            speak("Koneksi internet bermasalah.");
+        } finally {
+            isProcessing = false;
+            btnCapture.disabled = false;
+            btnCapture.innerText = "Ambil foto";
+            radarLine.style.display = "none";
+        }
+    }
+
+    function handleScanResult(result) {
+        if (!result) {
+            speak("Tidak ada respon.");
+            return;
+        }
+
+        let cleanResult = result.replace(/[\.\"\']/g, "")
+                                .replace(/\b(satu|dua|tiga|empat|lima)\s+lembar\b/gi, "")
+                                .replace(/\blembar\b/gi, "")
+                                .replace(/\bkeping\b/gi, "")
+                                .trim();
+
+        if (cleanResult === "TIDAK_ADA" || cleanResult.toLowerCase().includes("tidak ada")) {
+            cleanResult = "Tidak ada uang yang terdeteksi";
+        }
+
+        if (toggleVibrate.checked && navigator.vibrate) {
+            navigator.vibrate([60, 30, 60]);
+        }
+        playCashReaderSound();
+        speak(cleanResult);
+    }
+
+    window.addEventListener('DOMContentLoaded', autoCheckPermissionOnLoad);
+</script>
+
+</body>
+</html>
